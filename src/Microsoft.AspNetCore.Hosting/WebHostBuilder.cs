@@ -185,9 +185,6 @@ namespace Microsoft.AspNetCore.Hosting
                 configureLogging(_loggerFactory);
             }
 
-            // Create an event for stopping the hosted application
-            services.AddSingleton<ManualResetEvent>(new ManualResetEvent(false));
-
             //The configured ILoggerFactory is added as a singleton here. AddLogging below will not add an additional one.
             services.AddSingleton(_loggerFactory);
 
