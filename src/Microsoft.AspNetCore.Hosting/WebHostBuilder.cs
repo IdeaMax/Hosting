@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
+using System.Threading;
 using Microsoft.AspNetCore.Hosting.Builder;
 using Microsoft.AspNetCore.Hosting.Internal;
 using Microsoft.AspNetCore.Http;
@@ -183,6 +184,9 @@ namespace Microsoft.AspNetCore.Hosting
             {
                 configureLogging(_loggerFactory);
             }
+
+            // Create an event for stopping the hosted application
+            services.AddSingleton<ManualResetEvent>(new ManualResetEvent(false));
 
             //The configured ILoggerFactory is added as a singleton here. AddLogging below will not add an additional one.
             services.AddSingleton(_loggerFactory);
