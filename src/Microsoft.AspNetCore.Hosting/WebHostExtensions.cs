@@ -49,7 +49,6 @@ namespace Microsoft.AspNetCore.Hosting
 
                 var hostingEnvironment = host.Services.GetService<IHostingEnvironment>();
                 var applicationLifetime = host.Services.GetService<IApplicationLifetime>();
-                var hostingResetEvent = new ManualResetEvent(false);
 
                 Console.WriteLine($"Hosting environment: {hostingEnvironment.EnvironmentName}");
                 Console.WriteLine($"Content root path: {hostingEnvironment.ContentRootPath}");
@@ -68,13 +67,13 @@ namespace Microsoft.AspNetCore.Hosting
                     Console.WriteLine(shutdownMessage);
                 }
 
-                token.Register(() =>
+                token.Register(state =>
                 {
-                    hostingResetEvent.Set();
-                });
-                
-                hostingResetEvent.WaitOne();
-                applicationLifetime.StopApplication();
+                    ((IApplicationLifetime)state).StopApplication();
+                },
+                applicationLifetime);
+
+                applicationLifetime.ApplicationStopping.WaitHandle.WaitOne();
             }
         }
     }

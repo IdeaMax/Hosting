@@ -39,13 +39,16 @@ namespace Microsoft.AspNetCore.Hosting.Internal
         /// </summary>
         public void StopApplication()
         {
-            try
+            lock(_stoppingSource)
             {
-                _stoppingSource.Cancel(throwOnFirstException: false);
-            }
-            catch (Exception)
-            {
-                // TODO: LOG
+                try
+                {
+                    _stoppingSource.Cancel(throwOnFirstException: false);
+                }
+                catch (Exception)
+                {
+                    // TODO: LOG
+                }
             }
         }
 
