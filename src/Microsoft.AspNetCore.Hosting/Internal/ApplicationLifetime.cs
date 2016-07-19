@@ -39,7 +39,10 @@ namespace Microsoft.AspNetCore.Hosting.Internal
         /// </summary>
         public void StopApplication()
         {
-            lock(_stoppingSource)
+            // Lock on CTS to synchronize multiple calls to StopApplication. This guarantees that the first call 
+            // to StopApplication and its callbacks run to completion before subsequent calls to StopApplication, 
+            // which will no-op since the first call already requested cancellation, get a chance to execute.
+            lock (_stoppingSource)
             {
                 try
                 {
