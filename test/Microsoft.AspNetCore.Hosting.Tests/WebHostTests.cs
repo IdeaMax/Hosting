@@ -173,8 +173,7 @@ namespace Microsoft.AspNetCore.Hosting
                 .UseServer(this)
                 .UseStartup("Microsoft.AspNetCore.Hosting.Tests")
                 .Build();
-
-            var cts = new CancellationTokenSource();
+            
             var lifetime = host.Services.GetRequiredService<IApplicationLifetime>();
             var shutdownOrder = 0;
 
@@ -202,7 +201,7 @@ namespace Microsoft.AspNetCore.Hosting
             var runHostAndVerifyShutdown = Task.Run(() =>
             {
                 Assert.Equal(0, shutdownOrder++);
-                host.Run(cts.Token);
+                host.Run();
                 Assert.Equal(6, shutdownOrder++);
             });
 
