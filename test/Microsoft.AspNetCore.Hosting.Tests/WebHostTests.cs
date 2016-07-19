@@ -167,6 +167,58 @@ namespace Microsoft.AspNetCore.Hosting
         }
 
         [Fact]
+        public void WebHostShutsDownApplicationLifetimeEventsOrderedCorrectly()
+        {
+            var host = CreateBuilder()
+                .UseServer(this)
+                .UseStartup("Microsoft.AspNetCore.Hosting.Tests")
+                .Build();
+
+            var cts = new CancellationTokenSource();
+            var lifetime = host.Services.GetRequiredService<IApplicationLifetime>();
+            var shutdownOrder = 0;
+
+            lifetime.ApplicationStarted.Register(() =>
+            {
+                Assert.Equal(1, shutdownOrder++);
+            });
+
+            lifetime.ApplicationStopping.Register(() =>
+            {
+                Assert.Equal(2, shutdownOrder++);
+                // Simulate work. ApplicationStopping is triggered first but make it slower than ApplicationStopped.
+                Thread.Sleep(3000);
+                Assert.Equal(3, shutdownOrder++);
+            });
+
+            lifetime.ApplicationStopped.Register(() =>
+            {
+                Assert.Equal(4, shutdownOrder++);
+                // Simulate work. ApplicationStopped is triggered second but make it faster than ApplicationStopping.
+                Thread.Sleep(1000);
+                Assert.Equal(5, shutdownOrder++);
+            });
+
+            var runHostAndVerifyShutdown = Task.Run(() =>
+            {
+                Assert.Equal(0, shutdownOrder++);
+                host.Run(cts.Token);
+                Assert.Equal(6, shutdownOrder++);
+            });
+
+            // Add a delay to allow host to start before calling StopApplication
+            Task.Delay(500).ContinueWith(task => lifetime.StopApplication());
+
+            // Wait for all events to complete and host.Run() to complete
+            runHostAndVerifyShutdown.Wait();
+
+            // All lifetime events must be run to completion and executed in order
+            // host.Run started -> ApplicationStarted -> ApplicationStopping -> ApplicationStopped -> host.Run completed
+            // Each event must be completed before the next one triggers
+            Assert.Equal(7, shutdownOrder);
+        }
+
+        [Fact]
         public void WebHostDisposesServiceProvider()
         {
             var host = CreateBuilder()
