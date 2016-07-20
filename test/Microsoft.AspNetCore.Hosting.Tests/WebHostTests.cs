@@ -173,48 +173,55 @@ namespace Microsoft.AspNetCore.Hosting
                 .UseServer(this)
                 .UseStartup("Microsoft.AspNetCore.Hosting.Tests")
                 .Build();
-            
+
             var lifetime = host.Services.GetRequiredService<IApplicationLifetime>();
-            var shutdownOrder = 0;
+            var applicationStartedEvent = new ManualResetEvent(false);
+            var applicationStoppingEvent = new ManualResetEvent(false);
+            var applicationStoppedEvent = new ManualResetEvent(false);
+            var applicationStartedCompletedBeforeApplicationStopping = false;
+            var applicationStoppingCompletedBeforeApplicationStopped = false;
+            var applicationStoppedCompletedBeforeRunCompleted = false;
 
             lifetime.ApplicationStarted.Register(() =>
             {
-                Assert.Equal(1, shutdownOrder++);
+                applicationStartedEvent.Set();
             });
 
             lifetime.ApplicationStopping.Register(() =>
             {
-                Assert.Equal(2, shutdownOrder++);
-                // Simulate work. ApplicationStopping is triggered first but make it slower than ApplicationStopped.
-                Thread.Sleep(3000);
-                Assert.Equal(3, shutdownOrder++);
+                applicationStartedCompletedBeforeApplicationStopping = applicationStartedEvent.WaitOne(0);
+
+                // Simulate work.
+                Thread.Sleep(1000);
+
+                applicationStoppingEvent.Set();
             });
 
             lifetime.ApplicationStopped.Register(() =>
             {
-                Assert.Equal(4, shutdownOrder++);
-                // Simulate work. ApplicationStopped is triggered second but make it faster than ApplicationStopping.
-                Thread.Sleep(1000);
-                Assert.Equal(5, shutdownOrder++);
+                applicationStoppingCompletedBeforeApplicationStopped = applicationStoppingEvent.WaitOne(0);
+                applicationStoppedEvent.Set();
             });
 
             var runHostAndVerifyShutdown = Task.Run(() =>
             {
-                Assert.Equal(0, shutdownOrder++);
                 host.Run();
-                Assert.Equal(6, shutdownOrder++);
+                applicationStoppedCompletedBeforeRunCompleted = applicationStoppedEvent.WaitOne(0);
             });
 
-            // Add a delay to allow host to start before calling StopApplication
-            Task.Delay(500).ContinueWith(task => lifetime.StopApplication());
+            // Wait until application has started to shut down the host
+            Assert.True(applicationStartedEvent.WaitOne());
 
-            // Wait for all events to complete and host.Run() to complete
-            runHostAndVerifyShutdown.Wait();
+            // Trigger host shutdown on a separate thread
+            Task.Run(() => lifetime.StopApplication());
 
-            // All lifetime events must be run to completion and executed in order
-            // host.Run started -> ApplicationStarted -> ApplicationStopping -> ApplicationStopped -> host.Run completed
-            // Each event must be completed before the next one triggers
-            Assert.Equal(7, shutdownOrder);
+            // Wait for all events and host.Run() to complete
+            Assert.True(runHostAndVerifyShutdown.Wait(5000));
+
+            // Verify Ordering
+            Assert.True(applicationStartedCompletedBeforeApplicationStopping);
+            Assert.True(applicationStoppingCompletedBeforeApplicationStopped);
+            Assert.True(applicationStoppedCompletedBeforeRunCompleted);
         }
 
         [Fact]
