@@ -210,7 +210,7 @@ namespace Microsoft.AspNetCore.Hosting
             });
 
             // Wait until application has started to shut down the host
-            Assert.True(applicationStartedEvent.WaitOne());
+            Assert.True(applicationStartedEvent.WaitOne(5000));
 
             // Trigger host shutdown on a separate thread
             Task.Run(() => lifetime.StopApplication());
